@@ -2,6 +2,16 @@
 
 Standalone Linux control-plane client for Proxmox VE, packaged as an AppImage.
 
+## Verified V0.1 build
+
+The first AppImage has been built successfully on a clean Ubuntu 22.04 GitHub Actions runner. The verification pipeline passed JavaScript tests, Rust tests, the Tauri release build and AppImage artifact upload.
+
+**Artifact:** `webOwie-Proxmox-Client-AppImage`  
+**Built file:** `webOwie Proxmox Client_0.1.0_amd64.AppImage`  
+**SHA-256:** `b658aedcb4176f31b95a32e5a1fabe61a1c627d66cee68005e7d782f15c2d1fe`
+
+To download from GitHub: open **Actions → Build AppImage → successful run → Artifacts → webOwie-Proxmox-Client-AppImage**.
+
 ## V0.1 scope
 
 This first executable slice is intentionally **read/analyze-first**:
