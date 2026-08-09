@@ -45,7 +45,7 @@ jobs:
       - name: Build AppImage
         run: npm run tauri build -- --bundles appimage
 
-      - name: AppImage startup smoke test
+      - name: AppImage startup smoke test on Ubuntu 22.04
         shell: bash
         run: |
           chmod +x scripts/smoke-appimage.sh
@@ -60,12 +60,50 @@ jobs:
           path: src-tauri/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
 
+  compatibility-ubuntu-24:
+    needs: test-and-build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install runtime smoke-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgles2
+
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: webOwie-Proxmox-Client-AppImage
+          path: artifact
+
+      - name: AppImage startup smoke test on Ubuntu 24.04
+        shell: bash
+        run: |
+          chmod +x scripts/smoke-appimage.sh
+          appimage="$(find artifact -type f -name '*.AppImage' -print -quit)"
+          test -n "$appimage"
+          scripts/smoke-appimage.sh "$appimage"
+
+  publish-release:
+    needs: [test-and-build, compatibility-ubuntu-24]
+    if: startsWith(github.ref, 'refs/tags/app-v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified AppImage
+        uses: actions/download-artifact@v4
+        with:
+          name: webOwie-Proxmox-Client-AppImage
+          path: artifact
+
       - name: Publish tagged release
-        if: startsWith(github.ref, 'refs/tags/app-v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            src-tauri/target/release/bundle/appimage/*.AppImage \
+            artifact/*.AppImage \
+            --repo "$GITHUB_REPOSITORY" \
             --generate-notes \
             --title "webOwie Proxmox Client $GITHUB_REF_NAME"
