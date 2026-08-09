@@ -2,6 +2,15 @@
 
 Standalone Linux control-plane client for Proxmox VE, packaged as an AppImage.
 
+## Research identity
+
+**Project lead and system architect:** David Puchalla  
+**ORCID:** https://orcid.org/0009-0002-0223-0929  
+**ResearchID:** https://researchid.co/puchadav  
+**Project:** https://webowie.com
+
+Citation metadata is provided in [`CITATION.cff`](CITATION.cff) and machine-readable software metadata in [`codemeta.json`](codemeta.json). Versioned releases are intended to be archived through Zenodo for persistent DOI-based citation.
+
 ## Verified V0.1 build
 
 The first AppImage has been built successfully on a clean Ubuntu 22.04 GitHub Actions runner. The verification pipeline passed JavaScript tests, Rust tests, the Tauri release build and AppImage artifact upload.
