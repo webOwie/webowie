@@ -66,10 +66,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install runtime smoke-test dependencies
+      - name: Install desktop graphics runtime for smoke test
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb libgles2
+          sudo apt-get install -y xvfb libegl1 libgles2
 
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
