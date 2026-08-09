@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use webOwie Proxmox Client in research or technical work, please cite it using the metadata below."
+title: "webOwie Proxmox Client"
+type: software
+authors:
+  - family-names: "Puchalla"
+    given-names: "David"
+    orcid: "https://orcid.org/0009-0002-0223-0929"
+    affiliation: "webOwie"
+version: "0.1.0"
+date-released: "2026-08-09"
+repository-code: "https://github.com/webOwie/webowie"
+url: "https://webowie.com"
+keywords:
+  - Proxmox VE
+  - systems architecture
+  - infrastructure automation
+  - local-first
+  - privacy engineering
+  - cybersecurity
+  - reproducible infrastructure
+  - open source intelligence
+  - OSINT
+abstract: >-
+  webOwie Proxmox Client is a standalone Linux control-plane client for Proxmox VE.
+  The project focuses on controlled, auditable and reproducible infrastructure operations,
+  with explicit validation, simulation and rollback boundaries before infrastructure mutations.
