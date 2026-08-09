@@ -11,6 +11,18 @@ Standalone Linux control-plane client for Proxmox VE, packaged as an AppImage.
 
 Citation metadata is provided in [`CITATION.cff`](CITATION.cff) and machine-readable software metadata in [`codemeta.json`](codemeta.json). Versioned releases are intended to be archived through Zenodo for persistent DOI-based citation.
 
+## License
+
+Original webOwie source code in this repository is licensed under the **GNU Affero General Public License v3.0 only** (`AGPL-3.0-only`), unless a file or component states otherwise.
+
+- Full license: [`LICENSE`](LICENSE)
+- Licensing and dual-licensing policy: [`LICENSING.md`](LICENSING.md)
+- Project identity / trademark policy: [`TRADEMARKS.md`](TRADEMARKS.md)
+
+Separate commercial licensing may be offered by the copyright holder for proprietary, OEM or other uses that require terms different from the AGPL. A commercial license is not granted automatically by this repository.
+
+Copyright © 2026 David Puchalla.
+
 ## Verified V0.1 build
 
 The first AppImage has been built successfully on a clean Ubuntu 22.04 GitHub Actions runner. The verification pipeline passed JavaScript tests, Rust tests, the Tauri release build and AppImage artifact upload.
