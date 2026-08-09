@@ -19,7 +19,7 @@ jobs:
       - name: Install Tauri Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,6 +44,14 @@ jobs:
 
       - name: Build AppImage
         run: npm run tauri build -- --bundles appimage
+
+      - name: AppImage startup smoke test
+        shell: bash
+        run: |
+          chmod +x scripts/smoke-appimage.sh
+          appimage="$(find src-tauri/target/release/bundle/appimage -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          test -n "$appimage"
+          scripts/smoke-appimage.sh "$appimage"
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
