@@ -24,8 +24,14 @@ output=$(cd "$workdir/squashfs-root" && timeout "${TIMEOUT_SECONDS}s" xvfb-run -
 status=$?
 set -e
 
+if grep -Eq 'undefined symbol|Failed to load module|panicked at|Aborted' <<<"$output"; then
+  printf '%s\n' "$output" >&2
+  echo 'FAIL: AppImage emitted a fatal GTK/GIO/Rust startup signature.' >&2
+  exit 1
+fi
+
 if [[ $status -eq 124 ]]; then
-  echo 'PASS: AppImage stayed alive through startup smoke window.'
+  echo 'PASS: AppImage stayed alive through startup smoke window without fatal startup signatures.'
   exit 0
 fi
 
