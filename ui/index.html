@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>webOwie Proxmox Client</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">wO</div>
+        <div>
+          <strong>webOwie</strong>
+          <span>Proxmox Control Plane</span>
+        </div>
+      </div>
+      <nav>
+        <button class="nav-item active" data-view="infrastructure">Infrastructure Map</button>
+        <button class="nav-item" data-view="inventory">Inventory</button>
+        <button class="nav-item" data-view="server-factory">Server Factory <span>gated</span></button>
+        <button class="nav-item" data-view="network">Network Fabric <span>analyze</span></button>
+        <button class="nav-item" data-view="security">Security Controller <span>analyze</span></button>
+        <button class="nav-item" data-view="dns">DNS / ACME <span>gated</span></button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="dot"></span>
+        <span id="backendMode">Desktop backend</span>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Infrastructure Control Plane</p>
+          <h1>Cluster verstehen, bevor man ihn verändert.</h1>
+        </div>
+        <div class="top-actions">
+          <button id="demoButton" class="ghost">Demo laden</button>
+          <button id="connectButton" class="primary">Proxmox verbinden</button>
+        </div>
+      </header>
+
+      <section id="statusBanner" class="status-banner hidden"></section>
+
+      <section id="connectionPanel" class="panel connection-panel hidden">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Connection</p>
+            <h2>Proxmox VE</h2>
+          </div>
+          <button id="closeConnection" class="icon-button" aria-label="Schließen">×</button>
+        </div>
+        <form id="connectionForm" autocomplete="off">
+          <label>
+            Proxmox URL
+            <input id="baseUrl" type="url" value="https://pve01.local:8006" required />
+          </label>
+          <label>
+            API Token ID
+            <input id="tokenId" type="text" placeholder="root@pam!webowie" required />
+          </label>
+          <label>
+            API Token Secret
+            <input id="tokenSecret" type="password" placeholder="nur für diese Sitzung" required />
+          </label>
+          <label class="checkbox danger-checkbox">
+            <input id="invalidTls" type="checkbox" />
+            <span><strong>Bootstrap TLS:</strong> selbstsigniertes Zertifikat vorübergehend akzeptieren</span>
+          </label>
+          <p class="form-note">Das Token-Secret wird vom V1-Client nicht persistent gespeichert. Nach ACME/DNS-01 sollte Bootstrap TLS wieder deaktiviert werden.</p>
+          <div class="form-actions">
+            <button type="button" id="testConnection" class="ghost">Verbindung testen</button>
+            <button type="submit" class="primary">Verbinden & Inventar laden</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="metrics-grid" id="metricsGrid">
+        <article class="metric"><span>Nodes</span><strong id="nodeCount">0</strong></article>
+        <article class="metric"><span>VM / LXC</span><strong id="guestCount">0</strong></article>
+        <article class="metric"><span>Running</span><strong id="runningCount">0</strong></article>
+        <article class="metric"><span>Known Links</span><strong id="edgeCount">0</strong></article>
+      </section>
+
+      <section class="workspace-grid">
+        <article class="panel map-panel">
+          <div class="panel-heading map-heading">
+            <div>
+              <p class="eyebrow">Live architecture</p>
+              <h2>Infrastructure Map</h2>
+            </div>
+            <div class="segmented" role="group" aria-label="Map mode">
+              <button class="active" data-map-mode="actual">Actual</button>
+              <button data-map-mode="desired">Desired</button>
+              <button data-map-mode="diff">Diff</button>
+            </div>
+          </div>
+          <div class="map-legend">
+            <span><i class="legend node"></i>Proxmox Node</span>
+            <span><i class="legend guest"></i>VM/LXC</span>
+            <span><i class="legend link"></i>Service-Verbindung</span>
+          </div>
+          <div id="mapEmpty" class="empty-state">
+            <strong>Noch kein Cluster geladen.</strong>
+            <span>Verbinde Proxmox oder lade den Demo-Blueprint.</span>
+          </div>
+          <svg id="topologyMap" class="topology-map" viewBox="0 0 1100 620" role="img" aria-label="Infrastructure Map"></svg>
+        </article>
+
+        <article class="panel activity-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Safety state</p>
+              <h2>Controller Status</h2>
+            </div>
+          </div>
+          <div class="controller-state">
+            <div><span>Read / Analyze</span><strong class="ok">ACTIVE</strong></div>
+            <div><span>Plan / Simulate</span><strong>READY</strong></div>
+            <div><span>Apply / Mutations</span><strong class="warn">GATED</strong></div>
+          </div>
+          <div class="timeline" id="eventLog">
+            <div><span>BOOT</span><p>Client bereit. Keine schreibenden Befehle registriert.</p></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel inventory-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Resources</p>
+            <h2>Server & Guests</h2>
+          </div>
+        </div>
+        <div id="resourceGrid" class="resource-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
+  <aside id="serverDrawer" class="server-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow" id="drawerKind">SERVER</p>
+        <h2 id="drawerTitle">Server</h2>
+        <span id="drawerSubtitle"></span>
+      </div>
+      <button id="closeDrawer" class="icon-button">×</button>
+    </div>
+    <div class="tabs" id="drawerTabs">
+      <button class="active" data-tab="overview">Overview</button>
+      <button data-tab="network">Network</button>
+      <button data-tab="security">Security</button>
+      <button data-tab="sbom">SBOM</button>
+    </div>
+    <div id="drawerContent" class="drawer-content"></div>
+  </aside>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

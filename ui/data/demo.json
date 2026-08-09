@@ -1,0 +1,41 @@
+{
+  "resources": [
+    {"type":"node","id":"node/pve01","node":"pve01","status":"online","cpu":0.12,"mem":4294967296,"maxmem":17179869184},
+    {"type":"qemu","id":"qemu/101","node":"pve01","vmid":101,"name":"webowie-core","status":"running","cpu":0.08,"mem":2147483648,"maxmem":4294967296},
+    {"type":"lxc","id":"lxc/120","node":"pve01","vmid":120,"name":"webowie-mail","status":"running","cpu":0.04,"mem":1073741824,"maxmem":2147483648},
+    {"type":"lxc","id":"lxc/130","node":"pve01","vmid":130,"name":"postgres-main","status":"running","cpu":0.03,"mem":805306368,"maxmem":2147483648}
+  ],
+  "edges": [
+    {"from":"qemu/101","to":"lxc/130","protocol":"tcp","port":5432,"service":"PostgreSQL","policy":"allow","reason":"Primary application database"},
+    {"from":"lxc/120","to":"lxc/130","protocol":"tcp","port":5432,"service":"PostgreSQL","policy":"allow","reason":"Mail metadata database"}
+  ],
+  "metadata": {
+    "qemu/101": {
+      "network":{"plane":"SERVICE","zone":"APPLICATION","vlan":20,"ip":"10.20.0.10","dns":"core01.app.webowie.internal"},
+      "securityScore":97,
+      "services":["webOwie Core API :8443"],
+      "sbom":[
+        {"name":"webowie-core","version":"0.1.0","category":"application","purpose":"Infrastructure control API","responsibility":"control-plane","required":true,"owner":"webOwie Blueprint","service":"webowie-core","ports":[8443],"dependencies":["openssl"],"removalImpact":"Infrastructure control API stops","securityRelevance":"HIGH"},
+        {"name":"openssl","version":"3.x","category":"security","purpose":"TLS cryptography","responsibility":"transport-security","required":true,"owner":"OS Package Manager","service":null,"ports":[],"dependencies":[],"removalImpact":"TLS-dependent services fail","securityRelevance":"HIGH"}
+      ]
+    },
+    "lxc/120": {
+      "network":{"plane":"SERVICE","zone":"MAIL","vlan":40,"ip":"10.40.0.10","dns":"mail01.mail.webowie.internal"},
+      "securityScore":98,
+      "services":["SMTP :25","Submission :587","IMAPS :993"],
+      "sbom":[
+        {"name":"postfix","version":"3.x","category":"mail","purpose":"SMTP transport and routing","responsibility":"mail-transport","required":true,"owner":"webOwie Blueprint","service":"postfix","ports":[25,587],"dependencies":["openssl"],"removalImpact":"Mail delivery stops","securityRelevance":"HIGH"},
+        {"name":"dovecot","version":"2.x","category":"mail","purpose":"IMAP mailbox access","responsibility":"mail-access","required":true,"owner":"webOwie Blueprint","service":"dovecot","ports":[993],"dependencies":["openssl"],"removalImpact":"IMAP access stops","securityRelevance":"HIGH"},
+        {"name":"rspamd","version":"3.x","category":"mail-security","purpose":"Spam filtering","responsibility":"mail-security","required":true,"owner":"webOwie Blueprint","service":"rspamd","ports":[],"dependencies":["redis"],"removalImpact":"Spam filtering stops","securityRelevance":"MEDIUM"}
+      ]
+    },
+    "lxc/130": {
+      "network":{"plane":"SERVICE","zone":"DATABASE","vlan":30,"ip":"10.30.0.21","dns":"db01.database.webowie.internal"},
+      "securityScore":99,
+      "services":["PostgreSQL :5432"],
+      "sbom":[
+        {"name":"postgresql","version":"17.x","category":"database","purpose":"Primary relational database","responsibility":"data-persistence","required":true,"owner":"webOwie Blueprint","service":"postgresql","ports":[5432],"dependencies":["openssl"],"removalImpact":"Dependent applications lose persistent data access","securityRelevance":"HIGH"}
+      ]
+    }
+  }
+}

@@ -1,0 +1,61 @@
+name: Build AppImage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['app-v*']
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust stable
+        run: |
+          rustup update stable
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Install frontend tooling
+        run: npm install
+
+      - name: JavaScript tests
+        run: npm test
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build AppImage
+        run: npm run tauri build -- --bundles appimage
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webOwie-Proxmox-Client-AppImage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/app-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            src-tauri/target/release/bundle/appimage/*.AppImage \
+            --generate-notes \
+            --title "webOwie Proxmox Client $GITHUB_REF_NAME"
