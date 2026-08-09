@@ -1,0 +1,38 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "webOwie Proxmox Client",
+  "version": "0.1.0",
+  "description": "Standalone Linux control-plane client for Proxmox VE focused on controlled, auditable and reproducible infrastructure operations.",
+  "codeRepository": "https://github.com/webOwie/webowie",
+  "url": "https://webowie.com",
+  "datePublished": "2026-08-09",
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "David",
+      "familyName": "Puchalla",
+      "@id": "https://orcid.org/0009-0002-0223-0929",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "webOwie",
+        "url": "https://webowie.com"
+      }
+    }
+  ],
+  "keywords": [
+    "Proxmox VE",
+    "systems architecture",
+    "infrastructure automation",
+    "local-first",
+    "privacy engineering",
+    "cybersecurity",
+    "reproducible infrastructure",
+    "OSINT"
+  ],
+  "programmingLanguage": [
+    "Rust",
+    "JavaScript"
+  ],
+  "applicationCategory": "Systems Administration"
+}
