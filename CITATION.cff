@@ -11,6 +11,7 @@ version: "0.1.0"
 date-released: "2026-08-09"
 repository-code: "https://github.com/webOwie/webowie"
 url: "https://webowie.com"
+license: "AGPL-3.0-only"
 keywords:
   - Proxmox VE
   - systems architecture
