@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>webOwie Ops</title>
+  <style>
+    :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#071116;color:#eef7f8;font:15px/1.5 system-ui,sans-serif}.wrap{max-width:1100px;margin:auto;padding:32px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.brand{font-size:32px;font-weight:800}.muted{color:#8da3aa}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:24px}.card{background:#0d1a20;border:1px solid #1b343d;border-radius:16px;padding:18px}.kpi{font-size:28px;font-weight:750;margin-top:8px}.ok{color:#38d9b5}.warn{color:#f4b942}a{color:#7fe7ee;text-decoration:none}.flow{margin-top:24px;padding:18px;border-radius:16px;background:#0d1a20;border:1px solid #1b343d}.flow b{display:block;margin-bottom:8px}.pill{display:inline-block;padding:6px 10px;border:1px solid #29505c;border-radius:999px;margin:4px 4px 0 0}.footer{margin-top:30px;color:#6f8992;font-size:13px}</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><div class="brand">webOwie Ops</div><div class="muted">Swarm Control Plane · ${DEPLOY_ENV}</div></div><div class="pill">${GIT_SHA}</div></div>
+  <div class="grid">
+    <div class="card"><div class="muted">Release</div><div class="kpi">${IMAGE_TAG}</div></div>
+    <div class="card"><div class="muted">Orchestrator</div><div class="kpi ok">Docker Swarm</div></div>
+    <div class="card"><div class="muted">Delivery</div><div class="kpi">GitOps-ish CI/CD</div></div>
+    <div class="card"><div class="muted">Observability</div><div class="kpi"><a href="https://${GRAFANA_HOST}">Grafana ↗</a></div></div>
+  </div>
+  <div class="flow"><b>Delivery Flow</b><span class="pill">Plan</span><span class="pill">Test</span><span class="pill">Security</span><span class="pill">Package</span><span class="pill">Deploy</span><span class="pill">Verify</span><span class="pill">Rollback</span><span class="pill">Learn</span></div>
+  <div class="grid">
+    <div class="card"><b>DORA / Flow KPIs</b><p class="muted">Deployment Frequency · Lead Time · Change Failure Rate · MTTR</p></div>
+    <div class="card"><b>Reliability KPIs</b><p class="muted">Availability · Error Rate · Latency · Resource Saturation · Error Budget</p></div>
+    <div class="card"><b>Business View</b><p class="muted">Service adoption and value metrics are layered into Grafana instead of mixing business logic into the orchestrator.</p></div>
+  </div>
+  <div class="footer">Build ${GIT_SHA} · environment ${DEPLOY_ENV}</div>
+</div>
+</body>
+</html>
