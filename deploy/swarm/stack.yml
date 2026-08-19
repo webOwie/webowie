@@ -9,6 +9,7 @@ services:
       TASKS: "1"
       NETWORKS: "1"
       NODES: "1"
+      EVENTS: "1"
       INFO: "1"
       VERSION: "1"
       POST: "0"
@@ -34,6 +35,7 @@ services:
     command:
       - --providers.swarm=true
       - --providers.swarm.endpoint=tcp://socket-proxy:2375
+      - --providers.swarm.network=${STACK_NAME}_edge
       - --providers.swarm.exposedbydefault=false
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
@@ -250,6 +252,8 @@ services:
 networks:
   control:
     driver: overlay
+    driver_opts:
+      encrypted: ""
     internal: true
   edge:
     driver: overlay
