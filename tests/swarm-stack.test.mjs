@@ -8,11 +8,11 @@ const deploy = readFileSync('scripts/swarm-deploy.sh', 'utf8');
 const verify = readFileSync('scripts/swarm-verify.sh', 'utf8');
 
 const requiredServices = [
+  'socket-proxy:',
   'traefik:',
   'prometheus:',
   'grafana:',
-  'node-exporter:',
-  'cadvisor:'
+  'node-exporter:'
 ];
 
 test('swarm stack uses registry images and swarm-safe orchestration primitives', () => {
@@ -26,6 +26,13 @@ test('swarm stack uses registry images and swarm-safe orchestration primitives',
   assert.match(stack, /rollback_config:/);
   assert.match(stack, /resources:\s*\n\s+limits:/);
   assert.match(stack, /restart_policy:/);
+});
+
+test('docker socket is isolated behind a read-only internal proxy', () => {
+  assert.match(stack, /\/var\/run\/docker\.sock:\/var\/run\/docker\.sock:ro/);
+  assert.match(stack, /POST:\s*"0"/);
+  assert.match(stack, /internal:\s*true/);
+  assert.match(stack, /tcp:\/\/socket-proxy:2375/);
 });
 
 test('observability services are resource bounded and persistent where required', () => {
