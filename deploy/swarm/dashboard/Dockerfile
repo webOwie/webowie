@@ -1,10 +1,18 @@
-FROM nginx:1.27-alpine
+FROM busybox:1.37.0-musl
 
-ENV NGINX_ENVSUBST_OUTPUT_DIR=/usr/share/nginx/html
+RUN mkdir -p /www/cgi-bin /templates \
+    && chown -R 65534:65534 /www /templates
 
-COPY index.html.template /etc/nginx/templates/index.html.template
-COPY metrics.prometheus.template /etc/nginx/templates/metrics.prometheus.template
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --chown=65534:65534 index.html.template /templates/index.html.template
+COPY --chown=65534:65534 entrypoint.sh /entrypoint.sh
+COPY --chown=65534:65534 metrics.sh /www/cgi-bin/metrics
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/healthz || exit 1
+RUN chmod 0555 /entrypoint.sh /www/cgi-bin/metrics
+
+USER 65534:65534
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=3s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
