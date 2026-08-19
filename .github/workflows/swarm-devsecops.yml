@@ -60,9 +60,11 @@ jobs:
         env:
           STACK_NAME: webowie-ci
           DEPLOY_ENV: ci
+          DEPLOY_EPOCH: "1"
           OPS_HOST: ops.invalid
           GRAFANA_HOST: grafana.invalid
           GRAFANA_ADMIN_USER: admin
+          ACME_EMAIL: ci@example.invalid
           WEBOWIE_OPS_IMAGE: ghcr.io/webowie/webowie-ops
           IMAGE_TAG: test
           GIT_SHA: ${{ github.sha }}
@@ -157,12 +159,15 @@ jobs:
       - name: Render staging environment
         shell: bash
         run: |
+          deploy_epoch="$(date +%s)"
           cat > deploy/swarm/.env <<EOF
           STACK_NAME=webowie-staging
           DEPLOY_ENV=staging
+          DEPLOY_EPOCH=$deploy_epoch
           OPS_HOST=${{ vars.OPS_HOST }}
           GRAFANA_HOST=${{ vars.GRAFANA_HOST }}
           GRAFANA_ADMIN_USER=${{ vars.GRAFANA_ADMIN_USER || 'admin' }}
+          ACME_EMAIL=${{ vars.ACME_EMAIL }}
           WEBOWIE_OPS_IMAGE=${{ needs.package.outputs.image }}
           IMAGE_TAG=${{ needs.package.outputs.tag }}
           GIT_SHA=${{ github.sha }}
@@ -200,12 +205,15 @@ jobs:
       - name: Render production environment
         shell: bash
         run: |
+          deploy_epoch="$(date +%s)"
           cat > deploy/swarm/.env <<EOF
           STACK_NAME=webowie
           DEPLOY_ENV=production
+          DEPLOY_EPOCH=$deploy_epoch
           OPS_HOST=${{ vars.OPS_HOST }}
           GRAFANA_HOST=${{ vars.GRAFANA_HOST }}
           GRAFANA_ADMIN_USER=${{ vars.GRAFANA_ADMIN_USER || 'admin' }}
+          ACME_EMAIL=${{ vars.ACME_EMAIL }}
           WEBOWIE_OPS_IMAGE=${{ needs.package.outputs.image }}
           IMAGE_TAG=${{ needs.package.outputs.tag }}
           GIT_SHA=${{ github.sha }}
