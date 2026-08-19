@@ -53,7 +53,17 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Shell syntax
-        run: bash -n scripts/swarm-preflight.sh scripts/swarm-deploy.sh scripts/swarm-verify.sh
+        run: |
+          bash -n \
+            scripts/swarm-bootstrap.sh \
+            scripts/swarm-preflight.sh \
+            scripts/swarm-deploy.sh \
+            scripts/swarm-verify.sh \
+            deploy/swarm/dashboard/entrypoint.sh \
+            deploy/swarm/dashboard/metrics.sh
+
+      - name: Validate Grafana dashboard JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('deploy/swarm/config/webowie-devops-dashboard.json','utf8'))"
 
       - name: Validate Swarm stack rendering
         working-directory: deploy/swarm
@@ -83,7 +93,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Filesystem, secret and IaC scan
+      - name: Filesystem, dependency, secret and IaC report
         uses: aquasecurity/trivy-action@0.34.0
         with:
           scan-type: fs
@@ -95,13 +105,22 @@ jobs:
           scanners: vuln,secret,misconfig
 
       - name: Upload Trivy SARIF
-        if: always()
+        if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
 
+      - name: Block critical secrets and infrastructure misconfiguration
+        uses: aquasecurity/trivy-action@0.34.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL
+          scanners: secret,misconfig
+          exit-code: '1'
+
   package:
-    if: github.event_name != 'pull_request'
     needs: [quality, security]
     runs-on: ubuntu-24.04
     permissions:
@@ -115,12 +134,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - id: meta
         shell: bash
         run: |
@@ -128,7 +141,63 @@ jobs:
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "tag=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Build, attest and push ops dashboard
+      - name: Build local validation image
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/swarm/dashboard
+          load: true
+          push: false
+          tags: webowie-ops:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Runtime smoke test
+        shell: bash
+        run: |
+          container_id="$(docker run -d --rm \
+            -p 127.0.0.1:18080:8080 \
+            -e DEPLOY_ENV=ci \
+            -e DEPLOY_EPOCH=1 \
+            -e GRAFANA_HOST=grafana.invalid \
+            -e GIT_SHA="$GITHUB_SHA" \
+            -e IMAGE_TAG=ci \
+            webowie-ops:ci)"
+          trap 'docker stop "$container_id" >/dev/null 2>&1 || true' EXIT
+
+          ready=false
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == true ]]
+
+          curl -fsS http://127.0.0.1:18080/ | grep -F "$GITHUB_SHA"
+          curl -fsS http://127.0.0.1:18080/cgi-bin/metrics | grep -F 'webowie_build_info'
+          curl -fsS http://127.0.0.1:18080/cgi-bin/metrics | grep -F 'webowie_deploy_timestamp_seconds'
+
+      - name: Block critical image vulnerabilities
+        uses: aquasecurity/trivy-action@0.34.0
+        with:
+          scan-type: image
+          image-ref: webowie-ops:ci
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build, attest and push immutable ops dashboard
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
           context: deploy/swarm/dashboard
@@ -140,7 +209,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy-staging:
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'staging')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'staging'))
     needs: package
     runs-on: [self-hosted, linux, x64, swarm-staging-manager]
     environment: staging
@@ -186,7 +255,7 @@ jobs:
           scripts/swarm-deploy.sh deploy/swarm/.env
 
   deploy-production:
-    if: startsWith(github.ref, 'refs/tags/swarm-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production')
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/swarm-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production'))
     needs: package
     runs-on: [self-hosted, linux, x64, swarm-production-manager]
     environment: production
