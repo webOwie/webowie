@@ -7,7 +7,9 @@ Ressourcenschlanke Produktionsbasis für webOwie mit GitHub Actions, GHCR, Traef
 ```text
 Git / PR
   -> quality tests
-  -> Trivy DevSecOps gate
+  -> Trivy DevSecOps gates
+  -> OCI runtime smoke test
+  -> critical image scan
   -> BuildKit image + SBOM + provenance
   -> GHCR
   -> self-hosted Swarm manager runner
@@ -25,7 +27,7 @@ Basiskonfiguration pro Swarm, ohne Anwendungs-Workloads:
 
 - socket-proxy: 64 MiB Limit
 - Traefik: 192 MiB Limit
-- 2 x ops-dashboard: 64 MiB pro Task
+- 2 x BusyBox ops-dashboard: 64 MiB pro Task
 - Prometheus: 512 MiB Limit, 7 Tage Retention
 - Grafana: 384 MiB Limit
 - Node Exporter: 96 MiB pro Node
@@ -52,13 +54,19 @@ Für öffentlichen Ingress:
 - `80/tcp`
 - `443/tcp`
 
+Der Bootstrap gibt Join-Tokens standardmäßig nicht aus. Bei bewusstem Bedarf:
+
+```bash
+SHOW_JOIN_TOKEN=true scripts/swarm-bootstrap.sh 10.0.0.10
+```
+
 ## 2. DNS
 
 Mindestens zwei DNS-Namen auf die öffentliche Swarm-/Ingress-Adresse zeigen lassen:
 
 ```text
 ops.example.com
-GRAFANA.example.com
+grafana.example.com
 ```
 
 Beispielwerte im Environment:
@@ -84,7 +92,7 @@ GRAFANA_ADMIN_USER
 ACME_EMAIL
 ```
 
-Optional können die Image-Tags überschrieben und explizit gepinnt werden:
+Optional können die bereits gepinnten Baseline-Images überschrieben werden:
 
 ```text
 SOCKET_PROXY_IMAGE
@@ -171,13 +179,18 @@ Pull Request:
 - JavaScript Tests
 - Rust Tests
 - Shell Syntax
+- Grafana JSON Validation
 - Swarm Stack Render Validation
-- Trivy Vulnerability/Secret/Misconfiguration Scan
+- Trivy Vulnerability/Secret/Misconfiguration Report
+- Blocking Gate für kritische Secrets/IaC-Fehler
+- Build des minimalen BusyBox-OCI-Images
+- Runtime Smoke Test für `/`, `/healthz` und `/cgi-bin/metrics`
+- Blocking Gate für kritische Image-Vulnerabilities
 
 Push auf `main`:
 
-- alle Gates
-- Build des `webowie-ops` OCI Images
+- alle PR-Gates
+- Build des SHA-getaggten `webowie-ops` OCI Images
 - SBOM + Build Provenance
 - Push nach GHCR
 - Deployment nach Staging
@@ -209,4 +222,4 @@ Die nächsten BI-Erweiterungen sind Change Failure Rate, MTTR, Lead Time for Cha
 
 ## 10. Persistenz
 
-Prometheus-, Grafana- und ACME-Daten liegen aktuell in lokalen Docker Volumes auf den gelabelten Manager-Nodes. Für einen Single-Node- oder festen Manager-Cluster ist das bewusst einfach und ressourcenschlank. Vor automatischer Stateful-Failover-Migration auf andere Nodes muss ein shared/block storage Konzept ergänzt werden.
+Prometheus-, Grafana- und ACME-Daten liegen aktuell in lokalen Docker Volumes auf den gelabelten Manager-Nodes. Für einen Single-Node- oder festen Manager-Cluster ist das bewusst einfach und ressourcenschlank. Vor automatischer Stateful-Failover-Migration auf andere Nodes muss ein Shared-/Block-Storage-Konzept ergänzt werden.
