@@ -20,7 +20,7 @@ services:
       replicas: 1
       placement:
         constraints:
-          - node.role == manager
+          - node.labels.webowie.edge == true
       restart_policy:
         condition: on-failure
         delay: 5s
@@ -36,7 +36,13 @@ services:
       - --providers.swarm.endpoint=tcp://socket-proxy:2375
       - --providers.swarm.exposedbydefault=false
       - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
       - --api.dashboard=false
       - --ping=true
       - --log.level=INFO
@@ -49,6 +55,8 @@ services:
         published: 443
         protocol: tcp
         mode: ingress
+    volumes:
+      - traefik_acme:/letsencrypt
     networks:
       - control
       - edge
@@ -56,7 +64,7 @@ services:
       replicas: 1
       placement:
         constraints:
-          - node.role == manager
+          - node.labels.webowie.edge == true
       update_config:
         parallelism: 1
         order: start-first
@@ -82,11 +90,13 @@ services:
     image: ${WEBOWIE_OPS_IMAGE}:${IMAGE_TAG}
     environment:
       DEPLOY_ENV: ${DEPLOY_ENV}
+      DEPLOY_EPOCH: ${DEPLOY_EPOCH}
       GRAFANA_HOST: ${GRAFANA_HOST}
       GIT_SHA: ${GIT_SHA}
       IMAGE_TAG: ${IMAGE_TAG}
     networks:
       - edge
+      - observability
     deploy:
       replicas: 2
       labels:
@@ -94,6 +104,7 @@ services:
         - traefik.http.routers.webowie-ops.rule=Host(`${OPS_HOST}`)
         - traefik.http.routers.webowie-ops.entrypoints=websecure
         - traefik.http.routers.webowie-ops.tls=true
+        - traefik.http.routers.webowie-ops.tls.certresolver=le
         - traefik.http.services.webowie-ops.loadbalancer.server.port=80
       update_config:
         parallelism: 1
@@ -170,6 +181,13 @@ services:
       GF_SERVER_ROOT_URL: https://${GRAFANA_HOST}
     secrets:
       - grafana_admin_password
+    configs:
+      - source: grafana_datasources
+        target: /etc/grafana/provisioning/datasources/webowie.yml
+      - source: grafana_dashboards
+        target: /etc/grafana/provisioning/dashboards/webowie.yml
+      - source: webowie_devops_dashboard
+        target: /etc/grafana/dashboards/webowie-devops.json
     volumes:
       - grafana_data:/var/lib/grafana
     networks:
@@ -185,6 +203,7 @@ services:
         - traefik.http.routers.grafana.rule=Host(`${GRAFANA_HOST}`)
         - traefik.http.routers.grafana.entrypoints=websecure
         - traefik.http.routers.grafana.tls=true
+        - traefik.http.routers.grafana.tls.certresolver=le
         - traefik.http.services.grafana.loadbalancer.server.port=3000
       update_config:
         parallelism: 1
@@ -240,12 +259,19 @@ networks:
     attachable: true
 
 volumes:
+  traefik_acme:
   prometheus_data:
   grafana_data:
 
 configs:
   prometheus_config:
     file: ./config/prometheus.yml
+  grafana_datasources:
+    file: ./config/grafana-datasources.yml
+  grafana_dashboards:
+    file: ./config/grafana-dashboards.yml
+  webowie_devops_dashboard:
+    file: ./config/webowie-devops-dashboard.json
 
 secrets:
   grafana_admin_password:
