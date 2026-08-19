@@ -78,6 +78,47 @@ services:
         reservations:
           memory: 64M
 
+  ops-dashboard:
+    image: ${WEBOWIE_OPS_IMAGE}:${IMAGE_TAG}
+    environment:
+      DEPLOY_ENV: ${DEPLOY_ENV}
+      GRAFANA_HOST: ${GRAFANA_HOST}
+      GIT_SHA: ${GIT_SHA}
+      IMAGE_TAG: ${IMAGE_TAG}
+    networks:
+      - edge
+    deploy:
+      replicas: 2
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.webowie-ops.rule=Host(`${OPS_HOST}`)
+        - traefik.http.routers.webowie-ops.entrypoints=websecure
+        - traefik.http.routers.webowie-ops.tls=true
+        - traefik.http.services.webowie-ops.loadbalancer.server.port=80
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.25
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+        monitor: 30s
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 4
+        window: 60s
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 64M
+        reservations:
+          memory: 16M
+
   prometheus:
     image: ${PROMETHEUS_IMAGE}
     command:
