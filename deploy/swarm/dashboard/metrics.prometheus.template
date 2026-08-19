@@ -1,0 +1,7 @@
+# HELP webowie_deploy_timestamp_seconds Unix timestamp of the current deployment.
+# TYPE webowie_deploy_timestamp_seconds gauge
+webowie_deploy_timestamp_seconds{environment="${DEPLOY_ENV}"} ${DEPLOY_EPOCH}
+
+# HELP webowie_build_info Current webOwie ops build metadata.
+# TYPE webowie_build_info gauge
+webowie_build_info{environment="${DEPLOY_ENV}",git_sha="${GIT_SHA}",image_tag="${IMAGE_TAG}"} 1
