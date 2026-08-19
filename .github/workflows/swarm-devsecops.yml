@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Filesystem, dependency, secret and IaC report
-        uses: aquasecurity/trivy-action@0.34.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -113,7 +113,7 @@ jobs:
           sarif_file: trivy-results.sarif
 
       - name: Block critical secrets and infrastructure misconfiguration
-        uses: aquasecurity/trivy-action@0.34.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -182,7 +182,7 @@ jobs:
           curl -fsS http://127.0.0.1:18080/cgi-bin/metrics | grep -F 'webowie_deploy_timestamp_seconds'
 
       - name: Block critical image vulnerabilities
-        uses: aquasecurity/trivy-action@0.34.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: webowie-ops:ci
