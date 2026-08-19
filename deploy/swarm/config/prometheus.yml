@@ -8,9 +8,9 @@ scrape_configs:
       - targets: ["prometheus:9090"]
 
   - job_name: webowie-ops
-    metrics_path: /metrics
+    metrics_path: /cgi-bin/metrics
     static_configs:
-      - targets: ["ops-dashboard:80"]
+      - targets: ["ops-dashboard:8080"]
 
   - job_name: swarm-nodes
     dns_sd_configs:
