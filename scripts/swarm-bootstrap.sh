@@ -26,5 +26,11 @@ echo "Manager ready: $node_id"
 echo "Required inter-node firewall ports: 2377/tcp, 7946/tcp+udp, 4789/udp"
 echo "Public ingress ports: 80/tcp, 443/tcp"
 echo
-echo "Worker join command:"
-docker swarm join-token worker -q | sed "s#^#docker swarm join --token #" | sed "s#$# $ADVERTISE_ADDR:2377#"
+
+if [[ "${SHOW_JOIN_TOKEN:-false}" == "true" ]]; then
+  echo "Worker join command (sensitive):"
+  token="$(docker swarm join-token worker -q)"
+  printf 'docker swarm join --token %s %s:2377\n' "$token" "$ADVERTISE_ADDR"
+else
+  echo "Worker join token not printed. Run 'docker swarm join-token worker' interactively when needed."
+fi
