@@ -107,7 +107,7 @@ services:
         - traefik.http.routers.webowie-ops.entrypoints=websecure
         - traefik.http.routers.webowie-ops.tls=true
         - traefik.http.routers.webowie-ops.tls.certresolver=le
-        - traefik.http.services.webowie-ops.loadbalancer.server.port=80
+        - traefik.http.services.webowie-ops.loadbalancer.server.port=8080
       update_config:
         parallelism: 1
         delay: 5s
