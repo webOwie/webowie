@@ -1,5 +1,7 @@
 FROM nginx:1.27-alpine
 
+ENV NGINX_ENVSUBST_OUTPUT_DIR=/usr/share/nginx/html
+
 COPY index.html.template /etc/nginx/templates/index.html.template
 COPY metrics.prometheus.template /etc/nginx/templates/metrics.prometheus.template
 COPY nginx.conf /etc/nginx/conf.d/default.conf
