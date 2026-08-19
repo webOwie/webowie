@@ -25,6 +25,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
 
@@ -78,15 +79,16 @@ jobs:
           WEBOWIE_OPS_IMAGE: ghcr.io/webowie/webowie-ops
           IMAGE_TAG: test
           GIT_SHA: ${{ github.sha }}
-          SOCKET_PROXY_IMAGE: tecnativa/docker-socket-proxy:latest
-          TRAEFIK_IMAGE: traefik:v3
-          PROMETHEUS_IMAGE: prom/prometheus:latest
-          GRAFANA_IMAGE: grafana/grafana:latest
-          NODE_EXPORTER_IMAGE: quay.io/prometheus/node-exporter:latest
+          SOCKET_PROXY_IMAGE: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
+          TRAEFIK_IMAGE: traefik:v3.7.1
+          PROMETHEUS_IMAGE: prom/prometheus:v3.13.2
+          GRAFANA_IMAGE: grafana/grafana:13.1.3
+          NODE_EXPORTER_IMAGE: quay.io/prometheus/node-exporter:v1.12.1
         run: docker stack config --compose-file stack.yml >/dev/null
 
   security:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
@@ -123,6 +125,7 @@ jobs:
   package:
     needs: [quality, security]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: write
@@ -212,6 +215,7 @@ jobs:
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'staging'))
     needs: package
     runs-on: [self-hosted, linux, x64, swarm-staging-manager]
+    timeout-minutes: 15
     environment: staging
     permissions:
       contents: read
@@ -240,11 +244,11 @@ jobs:
           WEBOWIE_OPS_IMAGE=${{ needs.package.outputs.image }}
           IMAGE_TAG=${{ needs.package.outputs.tag }}
           GIT_SHA=${{ github.sha }}
-          SOCKET_PROXY_IMAGE=${{ vars.SOCKET_PROXY_IMAGE || 'tecnativa/docker-socket-proxy:latest' }}
-          TRAEFIK_IMAGE=${{ vars.TRAEFIK_IMAGE || 'traefik:v3' }}
-          PROMETHEUS_IMAGE=${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:latest' }}
-          GRAFANA_IMAGE=${{ vars.GRAFANA_IMAGE || 'grafana/grafana:latest' }}
-          NODE_EXPORTER_IMAGE=${{ vars.NODE_EXPORTER_IMAGE || 'quay.io/prometheus/node-exporter:latest' }}
+          SOCKET_PROXY_IMAGE=${{ vars.SOCKET_PROXY_IMAGE || 'ghcr.io/tecnativa/docker-socket-proxy:v0.5.0' }}
+          TRAEFIK_IMAGE=${{ vars.TRAEFIK_IMAGE || 'traefik:v3.7.1' }}
+          PROMETHEUS_IMAGE=${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:v3.13.2' }}
+          GRAFANA_IMAGE=${{ vars.GRAFANA_IMAGE || 'grafana/grafana:13.1.3' }}
+          NODE_EXPORTER_IMAGE=${{ vars.NODE_EXPORTER_IMAGE || 'quay.io/prometheus/node-exporter:v1.12.1' }}
           EOF
 
       - name: Deploy and verify staging
@@ -258,6 +262,7 @@ jobs:
     if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/swarm-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production'))
     needs: package
     runs-on: [self-hosted, linux, x64, swarm-production-manager]
+    timeout-minutes: 15
     environment: production
     permissions:
       contents: read
@@ -286,11 +291,11 @@ jobs:
           WEBOWIE_OPS_IMAGE=${{ needs.package.outputs.image }}
           IMAGE_TAG=${{ needs.package.outputs.tag }}
           GIT_SHA=${{ github.sha }}
-          SOCKET_PROXY_IMAGE=${{ vars.SOCKET_PROXY_IMAGE || 'tecnativa/docker-socket-proxy:latest' }}
-          TRAEFIK_IMAGE=${{ vars.TRAEFIK_IMAGE || 'traefik:v3' }}
-          PROMETHEUS_IMAGE=${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:latest' }}
-          GRAFANA_IMAGE=${{ vars.GRAFANA_IMAGE || 'grafana/grafana:latest' }}
-          NODE_EXPORTER_IMAGE=${{ vars.NODE_EXPORTER_IMAGE || 'quay.io/prometheus/node-exporter:latest' }}
+          SOCKET_PROXY_IMAGE=${{ vars.SOCKET_PROXY_IMAGE || 'ghcr.io/tecnativa/docker-socket-proxy:v0.5.0' }}
+          TRAEFIK_IMAGE=${{ vars.TRAEFIK_IMAGE || 'traefik:v3.7.1' }}
+          PROMETHEUS_IMAGE=${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:v3.13.2' }}
+          GRAFANA_IMAGE=${{ vars.GRAFANA_IMAGE || 'grafana/grafana:13.1.3' }}
+          NODE_EXPORTER_IMAGE=${{ vars.NODE_EXPORTER_IMAGE || 'quay.io/prometheus/node-exporter:v1.12.1' }}
           EOF
 
       - name: Deploy and verify production
