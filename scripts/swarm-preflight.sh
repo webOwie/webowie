@@ -15,7 +15,7 @@ set -a
 source "$ENV_FILE"
 set +a
 
-required=(STACK_NAME OPS_HOST GRAFANA_HOST GRAFANA_ADMIN_USER WEBOWIE_OPS_IMAGE IMAGE_TAG GIT_SHA SOCKET_PROXY_IMAGE TRAEFIK_IMAGE PROMETHEUS_IMAGE GRAFANA_IMAGE NODE_EXPORTER_IMAGE)
+required=(STACK_NAME DEPLOY_ENV DEPLOY_EPOCH OPS_HOST GRAFANA_HOST GRAFANA_ADMIN_USER ACME_EMAIL WEBOWIE_OPS_IMAGE IMAGE_TAG GIT_SHA SOCKET_PROXY_IMAGE TRAEFIK_IMAGE PROMETHEUS_IMAGE GRAFANA_IMAGE NODE_EXPORTER_IMAGE)
 for name in "${required[@]}"; do
   [[ -n "${!name:-}" ]] || fail "required variable $name is empty"
 done
@@ -26,10 +26,12 @@ control="$(docker info --format '{{.Swarm.ControlAvailable}}')"
 [[ "$control" == "true" ]] || fail "deployment must run on a Swarm manager"
 
 node_id="$(docker info --format '{{.Swarm.NodeID}}')"
-if ! docker node inspect "$node_id" --format '{{ index .Spec.Labels "webowie.monitoring" }}' 2>/dev/null | grep -qx true; then
-  echo "Labeling current manager as the monitoring node"
-  docker node update --label-add webowie.monitoring=true "$node_id" >/dev/null
-fi
+for label in webowie.monitoring webowie.edge; do
+  if ! docker node inspect "$node_id" --format "{{ index .Spec.Labels \"$label\" }}" 2>/dev/null | grep -qx true; then
+    echo "Labeling current manager: $label=true"
+    docker node update --label-add "$label=true" "$node_id" >/dev/null
+  fi
+done
 
 if ! docker secret inspect grafana_admin_password >/dev/null 2>&1; then
   [[ -n "${GRAFANA_ADMIN_PASSWORD:-}" ]] || fail "Swarm secret grafana_admin_password is missing and GRAFANA_ADMIN_PASSWORD is not set"
@@ -42,4 +44,4 @@ fi
   docker stack config --compose-file stack.yml >/dev/null
 )
 
-echo "Swarm preflight OK: stack=$STACK_NAME node=$node_id environment=${DEPLOY_ENV:-unknown}"
+echo "Swarm preflight OK: stack=$STACK_NAME node=$node_id environment=$DEPLOY_ENV"
