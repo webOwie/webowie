@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  - job_name: webowie-ops
+    metrics_path: /cgi-bin/metrics
+    static_configs:
+      - targets: ["ops-dashboard:8080"]
+
+  - job_name: swarm-nodes
+    dns_sd_configs:
+      - names: ["tasks.node-exporter"]
+        type: A
+        port: 9100
+        refresh_interval: 30s

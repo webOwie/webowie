@@ -1,0 +1,306 @@
+name: Swarm DevSecOps
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['swarm-v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        required: true
+        type: choice
+        options: [staging, production]
+        default: staging
+
+concurrency:
+  group: swarm-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Tauri Linux test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Setup Rust stable
+        run: |
+          rustup update stable
+          rustup default stable
+
+      - name: Install frontend tooling
+        run: npm install
+
+      - name: JavaScript tests
+        run: npm test
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Shell syntax
+        run: |
+          bash -n \
+            scripts/swarm-bootstrap.sh \
+            scripts/swarm-preflight.sh \
+            scripts/swarm-deploy.sh \
+            scripts/swarm-verify.sh \
+            deploy/swarm/dashboard/entrypoint.sh \
+            deploy/swarm/dashboard/metrics.sh
+
+      - name: Validate Grafana dashboard JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('deploy/swarm/config/webowie-devops-dashboard.json','utf8'))"
+
+      - name: Validate Swarm stack rendering
+        working-directory: deploy/swarm
+        env:
+          STACK_NAME: webowie-ci
+          DEPLOY_ENV: ci
+          DEPLOY_EPOCH: "1"
+          OPS_HOST: ops.invalid
+          GRAFANA_HOST: grafana.invalid
+          GRAFANA_ADMIN_USER: admin
+          ACME_EMAIL: ci@example.invalid
+          WEBOWIE_OPS_IMAGE: ghcr.io/webowie/webowie-ops
+          IMAGE_TAG: test
+          GIT_SHA: ${{ github.sha }}
+          SOCKET_PROXY_IMAGE: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0
+          TRAEFIK_IMAGE: traefik:v3.7.1
+          PROMETHEUS_IMAGE: prom/prometheus:v3.13.2
+          GRAFANA_IMAGE: grafana/grafana:13.1.3
+          NODE_EXPORTER_IMAGE: quay.io/prometheus/node-exporter:v1.12.1
+        run: docker stack config --compose-file stack.yml >/dev/null
+
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Filesystem, dependency, secret and IaC report
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          scanners: vuln,secret,misconfig
+
+      - name: Upload Trivy SARIF
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Block critical secrets and infrastructure misconfiguration
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL
+          scanners: secret,misconfig
+          exit-code: '1'
+
+  package:
+    needs: [quality, security]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - id: meta
+        shell: bash
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/webowie-ops"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build local validation image
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/swarm/dashboard
+          load: true
+          push: false
+          tags: webowie-ops:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Runtime smoke test
+        shell: bash
+        run: |
+          container_id="$(docker run -d --rm \
+            -p 127.0.0.1:18080:8080 \
+            -e DEPLOY_ENV=ci \
+            -e DEPLOY_EPOCH=1 \
+            -e GRAFANA_HOST=grafana.invalid \
+            -e GIT_SHA="$GITHUB_SHA" \
+            -e IMAGE_TAG=ci \
+            webowie-ops:ci)"
+          trap 'docker stop "$container_id" >/dev/null 2>&1 || true' EXIT
+
+          ready=false
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == true ]]
+
+          curl -fsS http://127.0.0.1:18080/ | grep -F "$GITHUB_SHA"
+          curl -fsS http://127.0.0.1:18080/cgi-bin/metrics | grep -F 'webowie_build_info'
+          curl -fsS http://127.0.0.1:18080/cgi-bin/metrics | grep -F 'webowie_deploy_timestamp_seconds'
+
+      - name: Block critical image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: webowie-ops:ci
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build, attest and push immutable ops dashboard
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/swarm/dashboard
+          push: true
+          tags: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'staging'))
+    needs: package
+    runs-on: [self-hosted, linux, x64, swarm-staging-manager]
+    timeout-minutes: 15
+    environment: staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Render staging environment
+        shell: bash
+        run: |
+          deploy_epoch="$(date +%s)"
+          cat > deploy/swarm/.env <<EOF
+          STACK_NAME=webowie-staging
+          DEPLOY_ENV=staging
+          DEPLOY_EPOCH=$deploy_epoch
+          OPS_HOST=${{ vars.OPS_HOST }}
+          GRAFANA_HOST=${{ vars.GRAFANA_HOST }}
+          GRAFANA_ADMIN_USER=${{ vars.GRAFANA_ADMIN_USER || 'admin' }}
+          ACME_EMAIL=${{ vars.ACME_EMAIL }}
+          WEBOWIE_OPS_IMAGE=${{ needs.package.outputs.image }}
+          IMAGE_TAG=${{ needs.package.outputs.tag }}
+          GIT_SHA=${{ github.sha }}
+          SOCKET_PROXY_IMAGE=${{ vars.SOCKET_PROXY_IMAGE || 'ghcr.io/tecnativa/docker-socket-proxy:v0.5.0' }}
+          TRAEFIK_IMAGE=${{ vars.TRAEFIK_IMAGE || 'traefik:v3.7.1' }}
+          PROMETHEUS_IMAGE=${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:v3.13.2' }}
+          GRAFANA_IMAGE=${{ vars.GRAFANA_IMAGE || 'grafana/grafana:13.1.3' }}
+          NODE_EXPORTER_IMAGE=${{ vars.NODE_EXPORTER_IMAGE || 'quay.io/prometheus/node-exporter:v1.12.1' }}
+          EOF
+
+      - name: Deploy and verify staging
+        env:
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+        run: |
+          chmod +x scripts/swarm-*.sh
+          scripts/swarm-deploy.sh deploy/swarm/.env
+
+  deploy-production:
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/swarm-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'production'))
+    needs: package
+    runs-on: [self-hosted, linux, x64, swarm-production-manager]
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Render production environment
+        shell: bash
+        run: |
+          deploy_epoch="$(date +%s)"
+          cat > deploy/swarm/.env <<EOF
+          STACK_NAME=webowie
+          DEPLOY_ENV=production
+          DEPLOY_EPOCH=$deploy_epoch
+          OPS_HOST=${{ vars.OPS_HOST }}
+          GRAFANA_HOST=${{ vars.GRAFANA_HOST }}
+          GRAFANA_ADMIN_USER=${{ vars.GRAFANA_ADMIN_USER || 'admin' }}
+          ACME_EMAIL=${{ vars.ACME_EMAIL }}
+          WEBOWIE_OPS_IMAGE=${{ needs.package.outputs.image }}
+          IMAGE_TAG=${{ needs.package.outputs.tag }}
+          GIT_SHA=${{ github.sha }}
+          SOCKET_PROXY_IMAGE=${{ vars.SOCKET_PROXY_IMAGE || 'ghcr.io/tecnativa/docker-socket-proxy:v0.5.0' }}
+          TRAEFIK_IMAGE=${{ vars.TRAEFIK_IMAGE || 'traefik:v3.7.1' }}
+          PROMETHEUS_IMAGE=${{ vars.PROMETHEUS_IMAGE || 'prom/prometheus:v3.13.2' }}
+          GRAFANA_IMAGE=${{ vars.GRAFANA_IMAGE || 'grafana/grafana:13.1.3' }}
+          NODE_EXPORTER_IMAGE=${{ vars.NODE_EXPORTER_IMAGE || 'quay.io/prometheus/node-exporter:v1.12.1' }}
+          EOF
+
+      - name: Deploy and verify production
+        env:
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+        run: |
+          chmod +x scripts/swarm-*.sh
+          scripts/swarm-deploy.sh deploy/swarm/.env
